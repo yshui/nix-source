@@ -4,14 +4,16 @@
 
   outputs = { self, nixpkgs, fenix, flake-utils }:
   with flake-utils.lib;
+  let
+    nix-source-with-pkgs = pkgs: pkgs.rustPlatform.buildRustPackage {
+      pname = "nix-source";
+      version = "0.0.1";
+      src = ./.;
+      cargoLock.lockFile = ./Cargo.lock;
+    };
+  in
     (eachSystem [ system.x86_64-linux ] (system: let
       pkgs = import nixpkgs { inherit system; };
-      nix-source-with-pkgs = pkgs: pkgs.rustPlatform.buildRustPackage {
-        pname = "nix-source";
-        version = "0.0.1";
-        src = ./.;
-        cargoLock.lockFile = ./Cargo.lock;
-      };
     in {
       packages = rec {
         default = nix-source;
