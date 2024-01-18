@@ -58,7 +58,7 @@ trait Command {
     fn execute(self, sources: std::path::PathBuf) -> anyhow::Result<()>;
 }
 
-/// add a source to the sources.json file
+/// add a source to the sources file
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "add")]
 struct AddCommand {
@@ -224,7 +224,7 @@ impl Command for AddCommand {
     }
 }
 
-/// update sources in the sources.json file
+/// update sources in the sources file
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "update")]
 struct UpdateCommand {
@@ -235,9 +235,6 @@ struct UpdateCommand {
 
 impl Command for UpdateCommand {
     fn execute(self, sources: std::path::PathBuf) -> anyhow::Result<()> {
-        if !sources.exists() {
-            anyhow::bail!("sources.json does not exist");
-        }
         let mut file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -272,11 +269,38 @@ impl Command for UpdateCommand {
     }
 }
 
+/// delete a source from the sources file
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "rm")]
+struct DeleteCommand {
+    /// name of the source
+    #[argh(positional)]
+    name: String,
+}
+
+impl Command for DeleteCommand {
+    fn execute(self, sources: std::path::PathBuf) -> anyhow::Result<()> {
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&sources)?;
+        let mut sources: Sources = serde_json::from_reader(&file)?;
+        if sources.sources.remove(&self.name).is_none() {
+            anyhow::bail!("source {} does not exist", self.name);
+        }
+        file.seek(std::io::SeekFrom::Start(0))?;
+        file.set_len(0)?;
+        serde_json::to_writer_pretty(file, &sources)?;
+        Ok(())
+    }
+}
+
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 enum SubCommands {
     Add(AddCommand),
     Update(UpdateCommand),
+    Delete(DeleteCommand),
 }
 
 impl Command for SubCommands {
@@ -284,6 +308,7 @@ impl Command for SubCommands {
         match self {
             SubCommands::Add(cmd) => cmd.execute(sources),
             SubCommands::Update(cmd) => cmd.execute(sources),
+            SubCommands::Delete(cmd) => cmd.execute(sources),
         }
     }
 }
